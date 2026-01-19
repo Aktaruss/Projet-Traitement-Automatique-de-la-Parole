@@ -4,6 +4,8 @@ import torch
 import torchaudio
 import torch.nn as nn
 import torch.optim as optim
+import matplotlib.pyplot as plt
+import numpy as np
 
 def get_basic_dataset(filename):
     with open(filename, "rb") as f:
@@ -66,7 +68,7 @@ def evaluate(model, loader, device):
             inputs = inputs.to(device)
             labels = labels.to(device)
             logits = model(inputs)
-            loss += criterion(logits,labels).detach().cpu().numpy()
+            loss += criterion(logits,labels).item()
             probs = torch.nn.functional.softmax(logits, dim=1)
             _, prediction = torch.max(logits, 1)
             all_preds.extend(prediction.cpu().numpy())
@@ -101,7 +103,7 @@ def train(model, train_loader, validation_loader, nb_steps=33000, val_step=400):
         loss.backward()
         optimizer.step()
 
-        train_loss.append(loss.detach().cpu().numpy())
+        train_loss.append(loss.item())
         step += 1
 
         if step == lr_drop:
@@ -114,3 +116,25 @@ def train(model, train_loader, validation_loader, nb_steps=33000, val_step=400):
             val_loss.append(loss)
 
     return model, train_loss, val_acc, val_loss
+
+def plot_data(ax,data_list,title,xtitle,ytitle,y0,y1,coeff=1):
+    for data,label,color in data_list:
+      x = np.arange(0,len(data)) * coeff
+      y = data
+      ax.plot(x,y,label=label,color=color)
+    ax.set_title(title, fontweight='bold')
+    ax.set_xlabel(xtitle)
+    ax.set_ylabel(ytitle)
+    ax.grid(True, which='both', linestyle='-', alpha=0.5)
+    ax.legend(loc='upper left', frameon=True, edgecolor='gray', fancybox=False)
+    ax.set_xlim(0, 35000)
+    ax.set_ylim(y0, y1)
+    ax.ticklabel_format(style='sci', axis='x', scilimits=(0, 4))
+
+def plot_all_data(data_list):
+    n = len(data_list)
+    fig, axes = plt.subplots(1, n, figsize=(6 * n, 5), constrained_layout=True)
+    if n == 1 :
+      axes = [axes]
+    for ax, (data,title,xtitle,ytitle,coeff,y0,y1) in  zip(axes,data_list):
+      plot_data(ax,data,title,xtitle,ytitle,y0,y1,coeff=coeff)
