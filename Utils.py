@@ -66,7 +66,7 @@ def evaluate(model, loader, device):
             inputs = inputs.to(device)
             labels = labels.to(device)
             logits = model(inputs)
-            loss += criterion(logits,labels).detach().numpy()
+            loss += criterion(logits,labels).detach().cpu().numpy()
             probs = torch.nn.functional.softmax(logits, dim=1)
             _, prediction = torch.max(logits, 1)
             all_preds.extend(prediction.cpu().numpy())
@@ -101,7 +101,7 @@ def train(model, train_loader, validation_loader, nb_steps=33000, val_step=400):
         loss.backward()
         optimizer.step()
 
-        train_loss.append(loss.detach().numpy())
+        train_loss.append(loss.detach().cpu().numpy())
         step += 1
 
         if step == lr_drop:
