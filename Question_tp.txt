@@ -1,0 +1,8 @@
+Pour la partition Train/Validation/Test faire la même que le dataset ou juste 80/10/10 une fois qu'on a toute les données?
+Doit on normaliser le signal ?
+Doit on prendre que les sons qui font exactement une secondes ? 1 sec : 95394 / sans : 105829 Padding/Truncation pour != 1 ?
+Dataset différent (+ de mots -> + de sons) normal ?
+Pas sur de comment faire le silence le 0.1 et le 0.8 ?
+Faire attention à la différence de proportion vrai label/unknown/silence.
+Pas sur de la construction du CNN meme si les dim correle ?
+Pas sur que un batch de 100 représente que +1 step ? (environ 25min train avec 1 step = 1 batch de 100)
