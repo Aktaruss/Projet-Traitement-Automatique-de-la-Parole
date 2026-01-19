@@ -112,7 +112,7 @@ def train(model, train_loader, validation_loader, nb_steps=33000, val_step=400):
                 param_group['lr'] = 0.0001
         
         if step % val_step == 0:
-            acc, _, _, _, loss = evaluate(model,validation_loader,device)
+            acc, _, _, _, loss = evaluate(model,validation_loader)
             val_acc.append(acc)
             val_loss.append(loss)
 
