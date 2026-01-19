@@ -56,7 +56,8 @@ def model_summary(model):
         print(f"Couche({name}) : {param} (Paramètres)")
     print(f"Total : {total} (Paramètres)")
 
-def evaluate(model, loader, device):
+def evaluate(model, loader):
+    device = "cuda" if torch.cuda.is_available() else "cpu"
     criterion=nn.CrossEntropyLoss()
     model.eval()
     all_preds = []
