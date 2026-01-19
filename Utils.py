@@ -56,15 +56,18 @@ def model_summary(model):
     print(f"Total : {total} (Paramètres)")
 
 def evaluate(model, loader, device):
+    criterion=nn.CrossEntropyLoss()
     model.eval()
     all_preds = []
     all_labels = []
     all_probs = []
+    loss = 0
     with torch.no_grad():
         for inputs, labels in loader:
             inputs = inputs.to(device)
             labels = labels.to(device)
             logits = model(inputs)
+            loss += criterion(logits,labels)
             probs = torch.nn.functional.softmax(logits, dim=1)
             _, prediction = torch.max(logits, 1)
             all_preds.extend(prediction.cpu().numpy())
@@ -72,7 +75,7 @@ def evaluate(model, loader, device):
             all_probs.extend(probs.cpu().numpy())
     correct = sum([all_preds[i] == all_labels[i] for i in range(len(all_preds))])
     accuracy = 100 * correct / len(all_labels)
-    return accuracy, all_preds, all_labels, all_probs
+    return accuracy, all_preds, all_labels, all_probs, loss/len(loader)
 
 def train(model, train_loader, validation_loader, nb_steps=33000, val_step=400):
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -84,6 +87,7 @@ def train(model, train_loader, validation_loader, nb_steps=33000, val_step=400):
     model.train()
     train_loss = []
     val_acc = []
+    val_loss = []
     step = 0
 
     while step < nb_steps:
@@ -106,7 +110,8 @@ def train(model, train_loader, validation_loader, nb_steps=33000, val_step=400):
                 param_group['lr'] = 0.0001
         
         if step % val_step == 0:
-            acc, _, _, _ = evaluate(model,validation_loader,device)
+            acc, _, _, _, loss = evaluate(model,validation_loader,device)
             val_acc.append(acc)
+            val_loss.append(loss)
 
-    return model, train_loss, val_acc
+    return model, train_loss, val_acc, val_loss
