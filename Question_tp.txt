@@ -8,3 +8,4 @@ Pas sur de la construction du CNN meme si les dim correle ?
 Pas sur que un batch de 100 représente que +1 step ? (environ 25min train avec 1 step = 1 batch de 100)
 Du mal à avoir le bon nombre de paramètre sauf avec des kernels bizare, normal ?
 Besoin de faire vanilla pour les plots ?
+Entrainement assez long quand meme normal ? et tous faire sur drive et sortir les logs ?

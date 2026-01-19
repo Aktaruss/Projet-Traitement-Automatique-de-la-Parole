@@ -6,6 +6,8 @@ import torch.nn as nn
 import torch.optim as optim
 import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
+from sklearn.metrics import confusion_matrix
 
 def get_basic_dataset(filename):
     with open(filename, "rb") as f:
@@ -139,3 +141,16 @@ def plot_all_data(data_list):
       axes = [axes]
     for ax, (data,title,xtitle,ytitle,coeff,y0,y1) in  zip(axes,data_list):
       plot_data(ax,data,title,xtitle,ytitle,y0,y1,coeff=coeff)
+
+def plot_custom_confusion_matrix(all_preds, all_labels, class_names=None):
+    cm = confusion_matrix(all_labels, all_preds)
+    plt.figure(figsize=(4, 4))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
+                xticklabels=class_names if class_names else "auto",
+                yticklabels=class_names if class_names else "auto")
+    plt.yticks(rotation=0)
+    plt.ylabel('Vrais Labels (Ground Truth)', fontweight='bold')
+    plt.xlabel('Prédictions du Modèle', fontweight='bold')
+    plt.title('Matrice de Confusion', fontsize=14, pad=15)
+    plt.show()
+    return cm
