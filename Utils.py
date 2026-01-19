@@ -67,7 +67,7 @@ def evaluate(model, loader, device):
             inputs = inputs.to(device)
             labels = labels.to(device)
             logits = model(inputs)
-            loss += criterion(logits,labels)
+            loss += criterion(logits,labels).item()
             probs = torch.nn.functional.softmax(logits, dim=1)
             _, prediction = torch.max(logits, 1)
             all_preds.extend(prediction.cpu().numpy())
