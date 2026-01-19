@@ -37,7 +37,6 @@ class SpeechCommandDataset(data.Dataset):
                 processed_signals.append(mfcc)
 
         self.signals = torch.stack(processed_signals)
-        print(self.signals.size())
 
     def __getitem__(self, idx):
         return self.signals[idx], self.labels[idx]
@@ -67,7 +66,7 @@ def evaluate(model, loader, device):
             inputs = inputs.to(device)
             labels = labels.to(device)
             logits = model(inputs)
-            loss += criterion(logits,labels).item()
+            loss += criterion(logits,labels).numpy()
             probs = torch.nn.functional.softmax(logits, dim=1)
             _, prediction = torch.max(logits, 1)
             all_preds.extend(prediction.cpu().numpy())
@@ -102,7 +101,7 @@ def train(model, train_loader, validation_loader, nb_steps=33000, val_step=400):
         loss.backward()
         optimizer.step()
 
-        train_loss.append(loss.item())
+        train_loss.append(loss.numpy())
         step += 1
 
         if step == lr_drop:
