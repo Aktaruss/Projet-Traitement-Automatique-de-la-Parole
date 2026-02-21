@@ -7,7 +7,8 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, roc_curve, auc, precision_recall_curve, average_precision_score
+from sklearn.preprocessing import label_binarize
 
 def get_basic_dataset(filename):
     with open(filename, "rb") as f:
@@ -35,6 +36,7 @@ class SpeechCommandDataset(data.Dataset):
 
         if transform_type == "MFCC":
             for sig in signals:
+                if len(sig) != 16000 : print('DIFFERNRECE')
                 if sig.ndim == 1:
                     sig = sig.unsqueeze(0)
                 mfcc = self.transform(sig)
@@ -121,10 +123,14 @@ def train(model, train_loader, validation_loader, nb_steps=33000, val_step=400):
     return model, train_loss, val_acc, val_loss
 
 def plot_data(ax,data_list,title,xtitle,ytitle,y0,y1,coeff=1):
+    save_dict = {}
     for data,label,color in data_list:
       x = np.arange(0,len(data)) * coeff
       y = data
       ax.plot(x,y,label=label,color=color)
+      save_dict[f"{label}_x"] = x
+      save_dict[f"{label}_y"] = data
+    np.savez("plot_data.npz", **save_dict)
     ax.set_title(title, fontweight='bold')
     ax.set_xlabel(xtitle)
     ax.set_ylabel(ytitle)
@@ -154,3 +160,60 @@ def plot_custom_confusion_matrix(all_preds, all_labels, class_names=None):
     plt.title('Matrice de Confusion', fontsize=14, pad=15)
     plt.show()
     return cm
+
+def plot_roc_curve(all_labels, all_probs, n_classes):
+  # On transforme les labels en format binaire (One-vs-Rest)
+  y_test_bin = label_binarize(all_labels, classes=range(n_classes))
+  y_score = np.array(all_probs) 
+
+  # 2. Calcul de la Micro-moyenne
+  # .ravel() permet d'aplatir les matrices pour traiter toutes les classes ensemble
+  fpr_micro, tpr_micro, _ = roc_curve(y_test_bin.ravel(), y_score.ravel())
+  roc_auc_micro = auc(fpr_micro, tpr_micro)
+  np.savez(f'roc_curve.npz', fpr=fpr_micro, tpr=tpr_micro, auc=roc_auc_micro)
+
+  # 3. Affichage
+  plt.figure(figsize=(6, 6))
+
+  plt.plot(fpr_micro, tpr_micro,
+          label='Courbe ROC micro-moyenne (aire = {0:0.2f})'.format(roc_auc_micro),
+          color='red', linestyle='-')
+
+  # Ligne de chance
+  plt.plot([0, 1], [0, 1], 'b--', lw=2)
+
+  plt.xlim([0.0, 1.0])
+  plt.ylim([0.0, 1.05])
+  plt.xlabel('Taux de Faux Positifs (FPR)')
+  plt.ylabel('Taux de Vrais Positifs (TPR)')
+  plt.title('Performance Globale : Courbe ROC Moyenne')
+  plt.legend(loc="lower right")
+  plt.grid(alpha=0.3)
+  plt.show()
+
+def plot_precision_recall_curve(all_labels, all_probs, n_classes):
+  # 1. Préparation des données (on reprend tes variables)
+  n_classes = 6
+  y_test_bin = label_binarize(all_labels, classes=range(n_classes))
+  y_score = np.array(all_probs)
+
+  # 2. Calcul de la Micro-moyenne pour Précision-Rappel
+  # .ravel() transforme les matrices (N, 6) en vecteurs plats (N*6,)
+  precision_micro, recall_micro, _ = precision_recall_curve(y_test_bin.ravel(), y_score.ravel())
+  average_precision_micro = average_precision_score(y_test_bin.ravel(), y_score.ravel())
+  np.savez('precision_recall.npz', precision=precision_micro, recall=recall_micro, ap=average_precision_micro)
+
+  # 3. Tracé du graphique
+  plt.figure(figsize=(7, 6))
+
+  plt.plot(recall_micro, precision_micro, color='blue',
+          label='Micro-average Precision-recall (AP = {0:0.2f})'.format(average_precision_micro))
+
+  plt.xlim([0.0, 1.0])
+  plt.ylim([0.0, 1.05])
+  plt.xlabel('Rappel (Recall)')
+  plt.ylabel('Précision (Precision)')
+  plt.title('Courbe Rappel-Précision Moyenne (Globale)')
+  plt.legend(loc="lower left")
+  plt.grid(True, alpha=0.3)
+  plt.show()
