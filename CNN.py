@@ -19,7 +19,7 @@ class CNN(nn.Module):
         self.conv1 = nn.Conv2d(in_channels=input_size,out_channels=64,kernel_size=(20,8),stride=(1,3),padding=(10,4))
         self.conv2 = nn.Conv2d(in_channels=64,out_channels=64,kernel_size=(10,4),stride=1,padding=(5,2))
 
-        self.lin = LowRankLinear(64 * 42 * 12, 32, rank=2)
+        self.lin = LowRankLinear(64 * 15 * 33, 32, rank=2)
         self.fc1 = nn.Linear(32, 128)
         self.fc2 = nn.Linear(128, output_size)
 
