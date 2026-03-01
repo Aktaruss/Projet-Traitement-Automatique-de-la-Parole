@@ -39,7 +39,7 @@ class SpeechCommandDataset(data.Dataset):
                 if len(sig) != 16000 : print('DIFFERNRECE')
                 if sig.ndim == 1:
                     sig = sig.unsqueeze(0)
-                mfcc = self.transform(sig)
+                mfcc = self.transform(sig).permute(0, 2, 1)
                 processed_signals.append(mfcc)
 
         self.signals = torch.stack(processed_signals)
