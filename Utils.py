@@ -60,67 +60,75 @@ def model_summary(model):
         print(f"Couche({name}) : {param} (Paramètres)")
     print(f"Total : {total} (Paramètres)")
 
-def evaluate(model, loader):
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    criterion=nn.CrossEntropyLoss()
-    model.eval()
-    all_preds = []
-    all_labels = []
-    all_probs = []
-    loss = 0
-    with torch.no_grad():
-        for inputs, labels in loader:
-            inputs = inputs.to(device)
-            labels = labels.to(device)
-            logits = model(inputs)
-            loss += criterion(logits,labels).item()
-            probs = torch.nn.functional.softmax(logits, dim=1)
-            _, prediction = torch.max(logits, 1)
-            all_preds.extend(prediction.cpu().numpy())
-            all_labels.extend(labels.cpu().numpy())
-            all_probs.extend(probs.cpu().numpy())
-    correct = sum([all_preds[i] == all_labels[i] for i in range(len(all_preds))])
-    accuracy = 100 * correct / len(all_labels)
-    return accuracy, all_preds, all_labels, all_probs, loss/len(loader)
-
 def train(model, train_loader, validation_loader, nb_steps=33000, val_step=400):
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    criterion=nn.CrossEntropyLoss()
-    optimizer=optim.SGD(model.parameters(), lr=0.001, momentum=0.9, nesterov=True)
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9, nesterov=True)
     lr_drop = nb_steps * (5/6)
     
     model.to(device)
-    model.train()
-    train_loss = []
-    val_acc = []
-    val_loss = []
+    train_loss_history = []
+    val_acc_history = []
+    val_loss_history = []
     step = 0
 
     while step < nb_steps:
+        model.train() # S'assurer d'être en mode train à chaque epoch
         for inputs, labels in train_loader:
             if step >= nb_steps:
                 break
 
             inputs, labels = inputs.to(device), labels.to(device)
+            
             optimizer.zero_grad()
             outputs = model(inputs)
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
 
-            train_loss.append(loss.item())
+            train_loss_history.append(loss.item())
             step += 1
 
-            if step == lr_drop:
+            # Learning rate decay
+            if step == int(lr_drop):
                 for param_group in optimizer.param_groups:
                     param_group['lr'] = 0.0001
             
+            # Validation périodique
             if step % val_step == 0:
-                acc, _, _, _, loss = evaluate(model,validation_loader)
-                val_acc.append(acc)
-                val_loss.append(loss)
+                acc, _, _, _, v_loss = evaluate(model, validation_loader)
+                val_acc_history.append(acc)
+                val_loss_history.append(v_loss)
+                print(f"Step {step}/{nb_steps} | Loss: {loss.item():.4f} | Val Acc: {acc:.2f}%")
 
-    return model, train_loss, val_acc, val_loss
+    return model, train_loss_history, val_acc_history, val_loss_history
+
+def evaluate(model, loader):
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    criterion = nn.CrossEntropyLoss()
+    model.eval()
+    
+    all_preds, all_labels, all_probs = [], [], []
+    total_loss = 0
+    
+    with torch.no_grad():
+        for inputs, labels in loader:
+            inputs, labels = inputs.to(device), labels.to(device)
+            logits = model(inputs)
+            
+            loss = criterion(logits, labels)
+            total_loss += loss.item()
+            
+            probs = torch.softmax(logits, dim=1)
+            _, prediction = torch.max(logits, 1)
+            
+            all_preds.extend(prediction.cpu().numpy())
+            all_labels.extend(labels.cpu().numpy())
+            all_probs.extend(probs.cpu().numpy())
+            
+    # Calcul de l'accuracy avec numpy pour la simplicité
+    accuracy = 100 * np.mean(np.array(all_preds) == np.array(all_labels))
+    return accuracy, all_preds, all_labels, all_probs, total_loss / len(loader)
 
 def plot_data(ax,data_list,title,xtitle,ytitle,y0,y1,coeff=1):
     save_dict = {}
