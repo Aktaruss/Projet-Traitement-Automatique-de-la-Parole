@@ -33,7 +33,7 @@ class CNN(nn.Module):
         x = self.dropOut(self.relu(self.conv2(x)))
         x = self.relu(self.lin(x.view(x.size(0), -1)))
         x = self.dropOut(self.relu(self.fc1(x)))
-        x = self.relu(self.fc2(x))
+        x = self.fc2(x)
         return x
 
     def check_size(self):
