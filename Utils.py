@@ -39,7 +39,7 @@ class SpeechCommandDataset(data.Dataset):
                 if len(sig) != 16000 : print('DIFFERNRECE')
                 if sig.ndim == 1:
                     sig = sig.unsqueeze(0)
-                mfcc = self.transform(sig).permute(0, 2, 1)
+                mfcc = self.transform(sig)
                 processed_signals.append(mfcc)
 
         self.signals = torch.stack(processed_signals)
@@ -101,24 +101,24 @@ def train(model, train_loader, validation_loader, nb_steps=33000, val_step=400):
             if step >= nb_steps:
                 break
 
-        inputs, labels = inputs.to(device), labels.to(device)
-        optimizer.zero_grad()
-        outputs = model(inputs)
-        loss = criterion(outputs, labels)
-        loss.backward()
-        optimizer.step()
+            inputs, labels = inputs.to(device), labels.to(device)
+            optimizer.zero_grad()
+            outputs = model(inputs)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
 
-        train_loss.append(loss.item())
-        step += 1
+            train_loss.append(loss.item())
+            step += 1
 
-        if step == lr_drop:
-            for param_group in optimizer.param_groups:
-                param_group['lr'] = 0.0001
-        
-        if step % val_step == 0:
-            acc, _, _, _, loss = evaluate(model,validation_loader)
-            val_acc.append(acc)
-            val_loss.append(loss)
+            if step == lr_drop:
+                for param_group in optimizer.param_groups:
+                    param_group['lr'] = 0.0001
+            
+            if step % val_step == 0:
+                acc, _, _, _, loss = evaluate(model,validation_loader)
+                val_acc.append(acc)
+                val_loss.append(loss)
 
     return model, train_loss, val_acc, val_loss
 
