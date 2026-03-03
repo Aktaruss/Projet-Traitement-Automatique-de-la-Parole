@@ -12,21 +12,21 @@ class DNN(nn.Module):
 
 		# Calcul de la taille d'entrée aplatie (98 * 40 = 3920 si MFCC standard)
 		self.input_dim = int(input_shape[0] * input_shape[1] * input_shape[2])
-
+		dropout = 0.5
 		self.network = nn.Sequential(
 			nn.Flatten(),
 
 			nn.Linear(self.input_dim, 128),
 			nn.ReLU(),
-			nn.Dropout(p=0.5),  #
+			nn.Dropout(p=dropout),  #
 
 			nn.Linear(128, 128),
 			nn.ReLU(),
-			nn.Dropout(p=0.5),
+			nn.Dropout(p=dropout),
 
 			nn.Linear(128, 128),
 			nn.ReLU(),
-			nn.Dropout(p=0.5),
+			nn.Dropout(p=dropout	),
 
 			nn.Linear(128, output_size)
 		)

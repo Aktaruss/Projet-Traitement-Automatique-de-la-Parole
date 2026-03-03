@@ -9,6 +9,7 @@ import numpy as np
 import seaborn as sns
 from sklearn.metrics import confusion_matrix, roc_curve, auc, precision_recall_curve, average_precision_score
 from sklearn.preprocessing import label_binarize
+import time
 
 def get_basic_dataset(filename):
     with open(filename, "rb") as f:
@@ -43,6 +44,9 @@ class SpeechCommandDataset(data.Dataset):
                 processed_signals.append(mfcc)
 
         self.signals = torch.stack(processed_signals)
+        mean = self.signals.mean()
+        std = self.signals.std()
+        #self.signals = (self.signals - mean) / (std + 1e-6)
 
     def __getitem__(self, idx):
         return self.signals[idx], self.labels[idx]
@@ -60,10 +64,10 @@ def model_summary(model):
         print(f"Couche({name}) : {param} (Paramètres)")
     print(f"Total : {total} (Paramètres)")
 
-def train(model, train_loader, validation_loader, nb_steps=33000, val_step=400):
+def train(model, train_loader, validation_loader, nb_steps=33000, val_step=400, lr_base=0.001):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9, nesterov=True)
+    optimizer = optim.SGD(model.parameters(), lr=lr_base, momentum=0.9, nesterov=True)
     lr_drop = nb_steps * (5/6)
     
     model.to(device)
@@ -72,8 +76,12 @@ def train(model, train_loader, validation_loader, nb_steps=33000, val_step=400):
     val_loss_history = []
     step = 0
 
+    # --- Début du chrono ---
+    start_time = time.time()
+    print(f"Début de l'entraînement sur {device}...")
+
     while step < nb_steps:
-        model.train() # S'assurer d'être en mode train à chaque epoch
+        model.train()
         for inputs, labels in train_loader:
             if step >= nb_steps:
                 break
@@ -89,17 +97,24 @@ def train(model, train_loader, validation_loader, nb_steps=33000, val_step=400):
             train_loss_history.append(loss.item())
             step += 1
 
-            # Learning rate decay
             if step == int(lr_drop):
                 for param_group in optimizer.param_groups:
                     param_group['lr'] = 0.0001
             
-            # Validation périodique
             if step % val_step == 0:
                 acc, _, _, _, v_loss = evaluate(model, validation_loader)
                 val_acc_history.append(acc)
                 val_loss_history.append(v_loss)
-                print(f"Step {step}/{nb_steps} | Loss: {loss.item():.4f} | Val Acc: {acc:.2f}%")
+                
+                # Calcul du temps écoulé depuis le début
+                elapsed = time.time() - start_time
+                print(f"Step {step}/{nb_steps} | Loss: {loss.item():.4f} | "
+                      f"Val Acc: {acc:.2f}% | Temps: {elapsed:.2f}s")
+
+    # --- Fin du chrono ---
+    total_time = time.time() - start_time
+    print(f"\nEntraînement terminé en {total_time:.2f} secondes "
+          f"({total_time/60:.2f} minutes).")
 
     return model, train_loss_history, val_acc_history, val_loss_history
 
@@ -225,3 +240,13 @@ def plot_precision_recall_curve(all_labels, all_probs, n_classes):
   plt.legend(loc="lower left")
   plt.grid(True, alpha=0.3)
   plt.show()
+
+def init_weights_normal(m):
+    # On vérifie si la couche est une couche linéaire ou de convolution
+    if isinstance(m, nn.Linear) or isinstance(m, nn.Conv2d):
+        # Initialisation des poids : moyenne=0, écart-type=0.01 (ajustable)
+        nn.init.normal_(m.weight, mean=0.0, std=0.01)
+        
+        # Initialisation des biais à zéro (recommandé)
+        if m.bias is not None:
+            nn.init.constant_(m.bias, 0)
