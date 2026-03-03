@@ -10,15 +10,13 @@ import seaborn as sns
 from sklearn.metrics import confusion_matrix, roc_curve, auc, precision_recall_curve, average_precision_score
 from sklearn.preprocessing import label_binarize
 import time
+import torch.nn.functional as F
+import librosa
 
 def get_basic_dataset(filename):
     with open(filename, "rb") as f:
         dataset = pickle.load(f)
     return dataset
-
-import torch
-import torch.utils.data as data
-import torchaudio
 
 class SpeechCommandDataset(data.Dataset):
     def __init__(self, signals, labels, metadata, transform_type="MFCC"):
@@ -45,6 +43,12 @@ class SpeechCommandDataset(data.Dataset):
                 ),
                 torchaudio.transforms.AmplitudeToDB()
             )
+        elif transform_type == "LPCC":
+            self.transform = LPCCTransform(
+                sample_rate=sample_rate, 
+                n_lpcc=40, 
+                target_frames=97
+            )
         else:
             self.transform = None
 
@@ -63,11 +67,63 @@ class SpeechCommandDataset(data.Dataset):
         std = self.signals.std()
         self.signals = (self.signals - mean) / (std + 1e-6)
 
+    def _compute_lpcc(self, waveform, n_lpcc=40, mel_kwargs=None):
+        lpc_coeffs = torchaudio.functional.lpc(waveform, hop_length=mel_kwargs["hop_length"], 
+                                               win_length=mel_kwargs["win_length"])
+        return lpc_coeffs.transpose(-1, -2)
+
     def __getitem__(self, idx):
         return self.signals[idx], self.labels[idx]
     
     def __len__(self):
         return len(self.labels)
+
+class LPCCTransform(torch.nn.Module):
+    def __init__(self, sample_rate=16000, n_lpcc=40, target_frames=98, order=12):
+        super().__init__()
+        self.sr = sample_rate
+        self.n_lpcc = n_lpcc
+        self.target_frames = target_frames
+        self.order = order
+
+    def forward(self, sig_tensor):
+        # Conversion Tensor -> Numpy pour librosa
+        y = sig_tensor.numpy().flatten()
+        
+        # Calcul du hop_length pour obtenir exactement target_frames
+        win_length = int(0.025 * self.sr)
+        hop_length = int((len(y) - win_length) / (self.target_frames - 1))
+        
+        # Prétraitement
+        y = librosa.effects.preemphasis(y)
+        frames = librosa.util.frame(y, frame_length=win_length, hop_length=hop_length)
+        frames = frames[:, :self.target_frames]
+        
+        lpcc_matrix = np.zeros((self.n_lpcc, self.target_frames))
+        
+        for t in range(self.target_frames):
+            windowed_frame = frames[:, t] * np.hamming(win_length)
+            # Calcul LPC
+            try:
+                lpc_coeffs = librosa.lpc(windowed_frame, order=self.order)
+                a = -lpc_coeffs[1:]
+                
+                # Récurrence LPCC
+                lpcc = np.zeros(self.n_lpcc)
+                lpcc[0] = a[0]
+                for n in range(2, min(self.n_lpcc, self.order) + 1):
+                    sum_val = sum((k / n) * lpcc[k-1] * a[n-k-1] for k in range(1, n))
+                    lpcc[n-1] = a[n-1] + sum_val
+                if self.n_lpcc > self.order:
+                    for n in range(self.order + 1, self.n_lpcc + 1):
+                        sum_val = sum((k / n) * lpcc[k-1] * a[n-k-1] for k in range(n - self.order, n))
+                        lpcc[n-1] = sum_val
+                lpcc_matrix[:, t] = lpcc
+            except:
+                # Sécurité si le calcul LPC échoue sur une trame silencieuse
+                continue
+                
+        return torch.tensor(lpcc_matrix, dtype=torch.float32).squeeze(0)
 
 def model_summary(model):
     total = 0
