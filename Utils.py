@@ -16,37 +16,52 @@ def get_basic_dataset(filename):
         dataset = pickle.load(f)
     return dataset
 
-class SpeechCommandDataset(data.Dataset):
-    def __init__(self, signals, labels, metadata, transform_type=None):
-        self.labels = torch.tensor(labels, dtype=torch.long)
+import torch
+import torch.utils.data as data
+import torchaudio
 
-        self.transform = torchaudio.transforms.MFCC(
-            sample_rate=16000,
-            n_mfcc=40,
-            melkwargs={
-                "n_fft": 512,
-                "n_mels": 40, 
-                "win_length": int(16000 * 0.03),
-                "hop_length": int(16000 * 0.01),
-                "center": False 
-            }
-        )
-        signals = [torch.tensor(sig, dtype=torch.float32) for sig in signals]
+class SpeechCommandDataset(data.Dataset):
+    def __init__(self, signals, labels, metadata, transform_type="MFCC"):
+        self.labels = torch.tensor(labels, dtype=torch.long)
+        sample_rate = 16000
+        mel_kwargs = {
+            "n_fft": 512,
+            "n_mels": 40,
+            "win_length": int(sample_rate * 0.03),
+            "hop_length": int(sample_rate * 0.01),
+            "center": False
+        }
+        if transform_type == "MFCC":
+            self.transform = torchaudio.transforms.MFCC(
+                sample_rate=sample_rate,
+                n_mfcc=40,
+                melkwargs=mel_kwargs
+            )
+        elif transform_type == "LogMel":
+            self.transform = torch.nn.Sequential(
+                torchaudio.transforms.MelSpectrogram(
+                    sample_rate=sample_rate,
+                    **mel_kwargs
+                ),
+                torchaudio.transforms.AmplitudeToDB()
+            )
+        else:
+            self.transform = None
 
         processed_signals = []
-
-        if transform_type == "MFCC":
-            for sig in signals:
-                if len(sig) != 16000 : print('DIFFERNRECE')
-                if sig.ndim == 1:
-                    sig = sig.unsqueeze(0)
-                mfcc = self.transform(sig)
-                processed_signals.append(mfcc)
-
+        for sig in signals:
+            sig_tensor = torch.tensor(sig, dtype=torch.float32)
+            if sig_tensor.ndim == 1:
+                sig_tensor = sig_tensor.unsqueeze(0)
+            if self.transform:
+                features = self.transform(sig_tensor)
+                processed_signals.append(features)
+            else:
+                processed_signals.append(sig_tensor)
         self.signals = torch.stack(processed_signals)
         mean = self.signals.mean()
         std = self.signals.std()
-        #self.signals = (self.signals - mean) / (std + 1e-6)
+        self.signals = (self.signals - mean) / (std + 1e-6)
 
     def __getitem__(self, idx):
         return self.signals[idx], self.labels[idx]
