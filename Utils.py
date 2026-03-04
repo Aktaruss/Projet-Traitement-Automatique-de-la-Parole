@@ -67,11 +67,6 @@ class SpeechCommandDataset(data.Dataset):
         std = self.signals.std()
         self.signals = (self.signals - mean) / (std + 1e-6)
 
-    def _compute_lpcc(self, waveform, n_lpcc=40, mel_kwargs=None):
-        lpc_coeffs = torchaudio.functional.lpc(waveform, hop_length=mel_kwargs["hop_length"], 
-                                               win_length=mel_kwargs["win_length"])
-        return lpc_coeffs.transpose(-1, -2)
-
     def __getitem__(self, idx):
         return self.signals[idx], self.labels[idx]
     
@@ -123,7 +118,7 @@ class LPCCTransform(torch.nn.Module):
                 # Sécurité si le calcul LPC échoue sur une trame silencieuse
                 continue
                 
-        return torch.tensor(lpcc_matrix, dtype=torch.float32).squeeze(0)
+        return torch.tensor(lpcc_matrix, dtype=torch.float32).unsqueeze(0)
 
 def model_summary(model):
     total = 0
